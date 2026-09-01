@@ -338,8 +338,10 @@ let trunkSlope = 0;      // trunk dx/dy at the body, in screen px/px
 function layoutBody() {
     const viewportHeight = window.innerHeight;
     if (viewportHeight < 2) return; // degenerate viewport: keep last position
-    const percent = Math.min(Math.max((springTop / viewportHeight - 0.10) / 0.80, 0), 1);
-    bodyYU = 100 + 800 * percent;
+    // sample the trunk at the body's visual CENTER (not the box's top edge),
+    // otherwise the whole drone rides offset sideways on slanted sections
+    const centerYPx = springTop + charWidth / 2;
+    bodyYU = Math.min(Math.max(centerYPx / viewportHeight * 1000, 0), 1000);
     vhCache = viewportHeight;
     currentVine = vineAt(bodyYU);
     trunkSlope = currentVine.dx / (currentVine.dy * viewportHeight / 1000);
