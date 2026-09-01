@@ -62,8 +62,8 @@ function vineAt(yU) {
     const x = u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0];
     const dx = 2 * u * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0]);
     const dy = 2 * u * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1]);
-    let w = 9.0 + 13.0 * (yU / 1000) + 2.6 * Math.sin(yU / 71) + 1.4 * Math.sin(yU / 29 + 2);
-    w = Math.max(w, 7);
+    let w = 19.0 + 7.0 * (yU / 1000) + 1.8 * Math.sin(yU / 71) + 1.0 * Math.sin(yU / 29 + 2);
+    w = Math.max(w, 17);
     return { x, dx, dy, w };
 }
 
@@ -147,10 +147,11 @@ function bodyCenterY() {
     return springTop + charWidth / 2;
 }
 
-// where a claw should grab: just past the trunk's edge at its current width
+// where a claw should grab: right at the trunk's edge at its current width,
+// so the whole leg stays on the bark (the claw curls over the edge)
 function gripX(leg) {
     const halfU = (currentVine.w / 2) * (100 / charWidth);
-    const offset = Math.min(Math.max(halfU + 4, 11), 23);
+    const offset = Math.min(Math.max(halfU + 1, 12), 25);
     return 50 + leg.side * offset;
 }
 
@@ -239,6 +240,17 @@ function renderLeg(leg, now) {
             if (swingHalf) fx += leg.side * Math.sin(ph) * 2.5; // outward step-around
         }
     }
+    // curvature correction: the body's lean already follows the trunk's
+    // tangent, but on bends the centerline curves away from that line.
+    // Shift each foot by the trunk's residual offset at ITS height, so
+    // every leg sits on the bark at its own position along the curve.
+    if (vhCache > 1) {
+        const dyPx = (fy - 50) * (charWidth / 100);
+        const yUf = bodyYU + dyPx * (1000 / vhCache);
+        const residualPx = (vineAt(yUf).x - currentVine.x) - trunkSlope * dyPx;
+        fx += residualPx * u;
+    }
+
     leg.renderedYPx = bodyCY + (fy - 50) / u;
 
     const [kx, ky, cfx, cfy] = ikKnee(leg.hip, fx, fy, leg.side);
@@ -319,11 +331,18 @@ function plantAllFeet() {
     }
 }
 
+let bodyYU = 100;        // trunk parameter at the body's position
+let vhCache = 0;
+let trunkSlope = 0;      // trunk dx/dy at the body, in screen px/px
+
 function layoutBody() {
     const viewportHeight = window.innerHeight;
     if (viewportHeight < 2) return; // degenerate viewport: keep last position
     const percent = Math.min(Math.max((springTop / viewportHeight - 0.10) / 0.80, 0), 1);
-    currentVine = vineAt(100 + 800 * percent);
+    bodyYU = 100 + 800 * percent;
+    vhCache = viewportHeight;
+    currentVine = vineAt(bodyYU);
+    trunkSlope = currentVine.dx / (currentVine.dy * viewportHeight / 1000);
 
     character.style.display = 'block';
     character.style.top = `${springTop.toFixed(2)}px`;
